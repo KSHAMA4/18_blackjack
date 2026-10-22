@@ -1,7 +1,5 @@
 from cards import Deck, hand_value
 
-BET = 10
-
 
 def is_blackjack(hand):
     """A natural: exactly two cards totalling 21."""
@@ -11,6 +9,8 @@ def is_blackjack(hand):
 class Blackjack:
     def __init__(self):
         self.chips = 100
+        self.bet = 0
+        self.settled = True  # no round in progress yet
 
     def show(self, player, dealer, hide=True):
         shown_dealer = ["??"] if hide else [f"{r}{s}" for r, s in dealer]
@@ -18,13 +18,35 @@ class Blackjack:
         print("Player:", " ".join(f"{r}{s}" for r, s in player),
               "=", hand_value(player))
 
+    def ask_bet(self):
+        """Prompt until a whole number from 1 to self.chips. None = quit."""
+        while True:
+            raw = input(f"Bet (1-{self.chips}, q to quit): ").strip().lower()
+            if raw == "q":
+                return None
+            if raw.isascii() and raw.isdigit():
+                bet = int(raw)
+                if 1 <= bet <= self.chips:
+                    return bet
+            print(f"Enter a whole number from 1 to {self.chips}.")
+
     def finish(self, delta, message):
-        """Single exit point for a finished round: apply chips, report, end."""
+        """Single exit point for a finished round: settle once, report, end."""
+        if self.settled:
+            raise RuntimeError("Round already settled")
+        self.settled = True
         self.chips += delta
         print(f"{message} Chips: {self.chips}")
         return True
 
     def round(self):
+        print(f"\nChips: {self.chips}")
+        bet = self.ask_bet()
+        if bet is None:
+            return False
+        self.bet = bet
+        self.settled = False
+
         deck = Deck()
         player = [deck.draw(), deck.draw()]
         dealer = [deck.draw(), deck.draw()]
@@ -37,8 +59,8 @@ class Blackjack:
             if p_nat and d_nat:
                 return self.finish(0, "Both have blackjack. Push.")
             if p_nat:
-                return self.finish(BET * 3 // 2, "Blackjack! Player wins 3:2.")
-            return self.finish(-BET, "Dealer has blackjack. Dealer wins.")
+                return self.finish(self.bet * 3 // 2, "Blackjack! Player wins 3:2.")
+            return self.finish(-self.bet, "Dealer has blackjack. Dealer wins.")
 
         # Player turn
         while hand_value(player) < 21:
@@ -51,7 +73,7 @@ class Blackjack:
                 player.append(deck.draw())
                 self.show(player, dealer)
                 if hand_value(player) > 21:
-                    return self.finish(-BET, "Bust. Dealer wins.")
+                    return self.finish(-self.bet, "Bust. Dealer wins.")
 
         # Dealer turn: draw until 17 or more
         while hand_value(dealer) < 17:
@@ -60,17 +82,20 @@ class Blackjack:
         self.show(player, dealer, hide=False)
         pv, dv = hand_value(player), hand_value(dealer)
         if dv > 21:
-            return self.finish(BET, "Dealer busts. Player wins.")
+            return self.finish(self.bet, "Dealer busts. Player wins.")
         if pv > dv:
-            return self.finish(BET, "Player wins.")
+            return self.finish(self.bet, "Player wins.")
         if pv < dv:
-            return self.finish(-BET, "Dealer wins.")
+            return self.finish(-self.bet, "Dealer wins.")
         return self.finish(0, "Push.")
 
     def run(self):
         print("Blackjack ΓÇö starting chips:", self.chips)
         while self.chips > 0:
             if not self.round():
+                return
+            if self.chips <= 0:
+                print("Out of chips. Game over.")
                 return
             if input("Play again? [y/n]: ").strip().lower() != "y":
                 return
