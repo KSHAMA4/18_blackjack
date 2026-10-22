@@ -1,9 +1,25 @@
 from cards import Deck, hand_value
 
 
+class EmptyDeck(Exception):
+    """Raised when a card is needed but the deck has none left."""
+
+
 def is_blackjack(hand):
     """A natural: exactly two cards totalling 21."""
     return len(hand) == 2 and hand_value(hand) == 21
+
+
+def draw_card(deck, hand, who, hidden=False):
+    """Draw one card into hand and announce it. Raises EmptyDeck if none left."""
+    card = deck.draw()
+    if card is None:
+        raise EmptyDeck
+    hand.append(card)
+    if hidden:
+        print(f"{who} draws a card")
+    else:
+        print(f"{who} draws {card[0]}{card[1]}")
 
 
 class Blackjack:
@@ -36,7 +52,8 @@ class Blackjack:
             raise RuntimeError("Round already settled")
         self.settled = True
         self.chips += delta
-        print(f"{message} Chips: {self.chips}")
+        change = f"{delta:+d} chips" if delta else "no chip change"
+        print(f"{message} ({change}) Chips: {self.chips}")
         return True
 
     def round(self):
@@ -46,10 +63,18 @@ class Blackjack:
             return False
         self.bet = bet
         self.settled = False
+        try:
+            return self._play()
+        except EmptyDeck:
+            return self.finish(0, "Deck ran out of cards. Round void, bet returned.")
 
+    def _play(self):
         deck = Deck()
-        player = [deck.draw(), deck.draw()]
-        dealer = [deck.draw(), deck.draw()]
+        player, dealer = [], []
+        draw_card(deck, player, "Player")
+        draw_card(deck, player, "Player")
+        draw_card(deck, dealer, "Dealer", hidden=True)
+        draw_card(deck, dealer, "Dealer", hidden=True)
         self.show(player, dealer)
 
         # Naturals are settled immediately, before the player can act.
@@ -70,14 +95,16 @@ class Blackjack:
             if key == "s":
                 break
             if key == "h":
-                player.append(deck.draw())
+                draw_card(deck, player, "Player")
                 self.show(player, dealer)
                 if hand_value(player) > 21:
                     return self.finish(-self.bet, "Bust. Dealer wins.")
+            else:
+                print(f"Invalid command '{key}'. Use h, s or q.")
 
         # Dealer turn: draw until 17 or more
         while hand_value(dealer) < 17:
-            dealer.append(deck.draw())
+            draw_card(deck, dealer, "Dealer")
 
         self.show(player, dealer, hide=False)
         pv, dv = hand_value(player), hand_value(dealer)
