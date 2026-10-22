@@ -14,9 +14,16 @@ class Deck:
 
 
 def hand_value(hand):
-    value = sum(11 if rank == "A" else 10 if rank in {"J", "Q", "K"} else int(rank)
-                for rank, _ in hand)
-    aces = sum(1 for rank, _ in hand if rank == "A")
+    value = 0
+    aces = 0
+    for rank, _ in hand:
+        if rank == "A":
+            value += 11
+            aces += 1
+        elif rank in {"J", "Q", "K"}:
+            value += 10
+        else:
+            value += int(rank)
 
     while value > 21 and aces:
         value -= 10
